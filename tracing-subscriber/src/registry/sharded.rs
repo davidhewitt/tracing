@@ -319,6 +319,10 @@ impl Subscriber for Registry {
         // calls to `try_close`: we have to ensure that all threads have
         // dropped their refs to the span before the span is closed.
         let refs = span.ref_count.fetch_add(1, Ordering::Relaxed);
+        #[cfg(feature = "std")]
+        if span.metadata.name() == "downloading files for compaction job" {
+            eprintln!("Cloning span {:?} to ref count {}", id, refs + 1);
+        }
         assert_ne!(
             refs, 0,
             "tried to clone a span ({:?}) that already closed",
@@ -351,6 +355,12 @@ impl Subscriber for Registry {
         };
 
         let refs = span.ref_count.fetch_sub(1, Ordering::Release);
+
+        #[cfg(feature = "std")]
+        if span.metadata.name() == "downloading files for compaction job" {
+            eprintln!("Try close span {:?} to ref count {}", id, refs - 1);
+        }
+
         if !std::thread::panicking() {
             assert!(refs < usize::MAX, "reference count overflow!");
         }
